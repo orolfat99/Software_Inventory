@@ -9,24 +9,23 @@ app = Flask(__name__)
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)  # Ensure the directory exists
 
-def save_data_to_json(system_info, software_list):
+def save_data_to_json(data):
     """
     Save the received data to a JSON file.
     """
     try:
-        # Get the Node Name from system_info
-        node_name = system_info.get("Node Name", "Unknown").replace(" ", "_")
+        # Print the received data for debugging
+        print("Data received by save_data_to_json:")
+        print(json.dumps(data, indent=4))  # Pretty-print the data
 
-        # Generate a filename based on the Node Name
-        output_file = os.path.join(DATA_DIR, f"{node_name}.json")
+        # Extract Node Name from the system_info section
+        node_name = data.get("system_info", {}).get("Node Name", "Unknown").replace(" ", "_")
 
-        # Combine system_info and software_list into a single dictionary
-        data = {
-            "system_info": system_info,
-            "software_list": software_list
-        }
+        # Generate a filename based on the Node Name and timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(DATA_DIR, f"{node_name}_{timestamp}.json")
 
-        # Write the data to the JSON file
+        # Save the entire data to the JSON file
         with open(output_file, mode="w", encoding="utf-8") as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
 
@@ -40,17 +39,22 @@ def receive_asset_data():
     """
     Endpoint to receive asset data from the agent.
     """
-    data = request.json
-    if data:
-        # Extract system info and software list
-        system_info = data.get("system_info", {})
-        software_list = data.get("software_list", [])
+    try:
+        data = request.json  # Parse the JSON payload
+        if not data:
+            print("No JSON payload received or payload is empty.")
+            return jsonify({"error": "No JSON payload received"}), 400
 
-        # Save the data to a JSON file
-        save_data_to_json(system_info, software_list)
+        print("Received payload:")
+        print(json.dumps(data, indent=4))  # Log the received data for debugging
+
+        # Save the received data to a JSON file
+        save_data_to_json(data)
 
         return jsonify({"message": "Data received and saved successfully"}), 200
-    return jsonify({"error": "No data received"}), 400
+    except Exception as e:
+        print(f"Error processing request: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":

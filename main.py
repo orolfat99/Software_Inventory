@@ -26,80 +26,57 @@ def get_system_info():
     }
 
 
-def get_installed_software():
+def get_installed_software_from_registry(hive, subkey):
     """
-    Retrieves a list of installed software using WMIC, the Windows Registry, and file metadata.
+    Retrieves installed software from the Windows Registry.
     """
     software_list = []
-
-    # Get software using WMIC
     try:
-        result = subprocess.run(
-            ["wmic", "product", "get", "Name,Version,Vendor"],
-            capture_output=True,
-            text=False,  # Capture raw bytes
-            shell=True
-        )
+        registry_key = winreg.OpenKey(hive, subkey, 0, winreg.KEY_READ)
+        i = 0
+        while True:
+            try:
+                subkey_name = winreg.EnumKey(registry_key, i)
+                app_key_path = f"{subkey}\\{subkey_name}"
+                app_key = winreg.OpenKey(hive, app_key_path, 0, winreg.KEY_READ)
 
-        if result.returncode == 0:
-            output = result.stdout.decode("cp850", errors="replace").strip()
-            lines = output.splitlines()
-            for line in lines[1:]:
-                columns = [c.strip() for c in line.split("  ") if c.strip()]
-                if len(columns) >= 1:
-                    software = {
-                        "Name": clean_text(columns[0]),
-                        "Version": clean_text(columns[1]) if len(columns) > 1 else "N/A",
-                        "Vendor": clean_text(columns[2]) if len(columns) > 2 else "N/A"
-                    }
-                    software_list.append(software)
-    except Exception as e:
-        print(f"Error using WMIC: {e}")
+                display_name = winreg.QueryValueEx(app_key, "DisplayName")[0]
+                try:
+                    display_version = winreg.QueryValueEx(app_key, "DisplayVersion")[0]
+                except FileNotFoundError:
+                    display_version = "N/A"
 
-    # Get software from the Windows Registry
-    try:
-        reg_paths = [
-            r"SOFTWARE/Microsoft\Windows/CurrentVersion/Uninstall",
-            r"SOFTWARE/WOW6432Node/Microsoft\Windows/CurrentVersion/Uninstall"
-        ]
-
-        for reg_path in reg_paths:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
-                software_list.extend(query_registry_key(key))
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path) as key:
-                software_list.extend(query_registry_key(key))
-
+                software_list.append({
+                    "Name": display_name,
+                    "Version": display_version
+                })
+            except FileNotFoundError:
+                pass
+            except OSError:
+                break
+            i += 1
     except Exception as e:
         print(f"Error accessing registry: {e}")
+    return software_list
+
+
+def get_installed_software():
+    """
+    Retrieves a list of installed software using the Windows Registry.
+    """
+    registry_paths = [
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall")
+    ]
+
+    all_software = []
+    for hive, path in registry_paths:
+        all_software.extend(get_installed_software_from_registry(hive, path))
 
     # Remove duplicates (if any) by converting to a dictionary and back to a list
-    unique_software = {f"{s['Name']}|{s['Version']}|{s['Vendor']}": s for s in software_list}
+    unique_software = {f"{s['Name']}|{s['Version']}": s for s in all_software}
     return list(unique_software.values())
-
-
-def query_registry_key(key):
-    """
-    Helper function to query a registry key for installed software.
-    """
-    software_list = []
-    for i in range(0, winreg.QueryInfoKey(key)[0]):
-        try:
-            subkey_name = winreg.EnumKey(key, i)
-            with winreg.OpenKey(key, subkey_name) as subkey:
-                name = clean_text(winreg.QueryValueEx(subkey, "DisplayName")[0])
-                version = clean_text(winreg.QueryValueEx(subkey, "DisplayVersion")[0]) if "DisplayVersion" in winreg.QueryValueEx(subkey, "DisplayVersion") else "N/A"
-                vendor = clean_text(winreg.QueryValueEx(subkey, "Publisher")[0]) if "Publisher" in winreg.QueryValueEx(subkey, "Publisher") else "N/A"
-                if name:  # Only add entries with a valid name
-                    software_list.append({
-                        "Name": name,
-                        "Version": version,
-                        "Vendor": vendor
-                    })
-        except FileNotFoundError:
-            continue
-        except Exception as e:
-            print(f"Error reading registry: {e}")
-    return software_list
 
 
 def clean_text(text):

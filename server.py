@@ -15,8 +15,8 @@ def save_data_to_json(data):
     """
     try:
         # Print the received data for debugging
-        print("Data received by save_data_to_json:")
-        print(json.dumps(data, indent=4))  # Pretty-print the data
+        # print("Data received by save_data_to_json:")
+        # print(json.dumps(data, indent=4))  # Pretty-print the data
 
         # Extract Node Name from the system_info section
         node_name = data.get("system_info", {}).get("Node Name", "Unknown").replace(" ", "_")

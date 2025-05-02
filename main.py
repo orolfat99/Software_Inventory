@@ -6,6 +6,7 @@ import subprocess
 import uuid
 import winreg
 import os
+import shutil
 
 def get_system_info():
     """
@@ -58,8 +59,8 @@ def get_installed_software():
     # Get software from the Windows Registry
     try:
         reg_paths = [
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+            r"SOFTWARE/Microsoft\Windows/CurrentVersion/Uninstall",
+            r"SOFTWARE/WOW6432Node/Microsoft\Windows/CurrentVersion/Uninstall"
         ]
 
         for reg_path in reg_paths:
@@ -110,15 +111,11 @@ def clean_text(text):
     return text.encode("utf-8", errors="replace").decode("utf-8", errors="ignore").strip()
 
 
-def save_to_json(system_info, software_list, output_file):
+def save_to_json(data, unused, output_file):
     """
     Save the collected data to a JSON file.
     """
     try:
-        data = {
-            "system_info": system_info,
-            "software_list": software_list
-        }
         with open(output_file, mode="w", encoding="utf-8") as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
         print(f"Data saved to {output_file}")
@@ -227,54 +224,184 @@ def get_network_configuration():
     return network_info
 
 
+def get_hardware_info():
+    """
+    Collects hardware information such as CPU, RAM, and disk space.
+    """
+    hardware_info = {}
+    try:
+        # CPU Information
+        hardware_info["CPU"] = platform.processor()
+
+        # RAM Information
+        result = subprocess.run(["wmic", "memorychip", "get", "Capacity"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            ram_sizes = [int(x.strip()) for x in result.stdout.splitlines() if x.strip().isdigit()]
+            hardware_info["RAM"] = f"{sum(ram_sizes) / (1024 ** 3):.2f} GB"
+
+        # Disk Space
+        total, used, free = shutil.disk_usage("/")
+        hardware_info["Disk"] = {
+            "Total": f"{total / (1024 ** 3):.2f} GB",
+            "Used": f"{used / (1024 ** 3):.2f} GB",
+            "Free": f"{free / (1024 ** 3):.2f} GB"
+        }
+    except Exception as e:
+        print(f"Error collecting hardware information: {e}")
+    return hardware_info
+
+
+def get_user_accounts():
+    """
+    Collects information about user accounts on the system.
+    """
+    users = []
+    try:
+        result = subprocess.run(["net", "user"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            lines = result.stdout.splitlines()
+            for line in lines[4:-2]:  # Skip header and footer
+                users.extend(line.split())
+    except Exception as e:
+        print(f"Error collecting user accounts: {e}")
+    return users
+
+
+def get_security_software():
+    """
+    Detects installed security software (e.g., antivirus, firewall).
+    """
+    security_software = []
+    try:
+        result = subprocess.run(["wmic", "product", "get", "Name"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if "antivirus" in line.lower() or "security" in line.lower() or "firewall" in line.lower():
+                    security_software.append(line.strip())
+    except Exception as e:
+        print(f"Error detecting security software: {e}")
+    return security_software
+
+
+def get_running_processes():
+    """
+    Collects a list of running processes on the system.
+    """
+    processes = []
+    try:
+        result = subprocess.run(["tasklist"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            lines = result.stdout.splitlines()
+            for line in lines[3:]:  # Skip header rows
+                processes.append(line.split()[0])  # Process name is the first column
+    except Exception as e:
+        print(f"Error collecting running processes: {e}")
+    return processes
+
+
+def get_network_connections():
+    """
+    Collects active network connections and open ports.
+    """
+    connections = []
+    try:
+        result = subprocess.run(["netstat", "-an"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            connections = result.stdout.splitlines()
+    except Exception as e:
+        print(f"Error collecting network connections: {e}")
+    return connections
+
+
+def get_update_status():
+    """
+    Collects information about the system's update status.
+    """
+    updates = []
+    try:
+        result = subprocess.run(["wmic", "qfe", "list", "brief"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            updates = result.stdout.splitlines()
+    except Exception as e:
+        print(f"Error collecting update status: {e}")
+    return updates
+
+
+def get_disk_encryption_status():
+    """
+    Checks if disk encryption (e.g., BitLocker) is enabled.
+    """
+    encryption_status = {}
+    try:
+        result = subprocess.run(["manage-bde", "-status"], capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            encryption_status = result.stdout.strip()
+    except Exception as e:
+        print(f"Error collecting disk encryption status: {e}")
+    return encryption_status
+
+
 if __name__ == "__main__":
     # Configuration
-    SERVER_URL = "http://192.168.25.89:5000/api/asset"  # Replace with your server's URL
-    SAVE_LOCALLY = True  # Set to True to save data locally as a backup
-
-    print("Collecting system information...")
     system_info = get_system_info()
-
-    print("\nCollecting installed software...")
-    software_list = get_installed_software()
-
-    print("\nCollecting programming languages...")
     programming_languages = get_programming_languages()
-
-    print("\nCollecting development tools...")
     development_tools = get_development_tools()
-
-    print("\nCollecting environment variables...")
     environment_variables = get_environment_variables()
 
     print("\nCollecting network configuration...")
     network_configuration = get_network_configuration()
 
-    # Combine all collected data
+    print("\nCollecting hardware information...")
+    hardware_info = get_hardware_info()
+
+    print("\nCollecting user accounts...")
+    user_accounts = get_user_accounts()
+
+    print("\nCollecting security software...")
+    security_software = get_security_software()
+
+    print("\nCollecting running processes...")
+    running_processes = get_running_processes()
+
+    print("\nCollecting network connections...")
+    network_connections = get_network_connections()
+
+    print("\nCollecting update status...")
+    update_status = get_update_status()
+
+    print("\nCollecting disk encryption status...")
+    disk_encryption_status = get_disk_encryption_status()
+
+    print("\nCollecting installed software...")
+    software_list = get_installed_software()
+
+    # Combine all collected data with software_list as the last key
     collected_data = {
         "system_info": system_info,
-        "software_list": software_list,
         "programming_languages": programming_languages,
         "development_tools": development_tools,
         "environment_variables": environment_variables,
-        "network_configuration": network_configuration
+        "network_configuration": network_configuration,
+        "hardware_info": hardware_info,
+        "user_accounts": user_accounts,
+        "security_software": security_software,
+        "running_processes": running_processes,
+        "network_connections": network_connections,
+        "update_status": update_status,
+        "disk_encryption_status": disk_encryption_status,
+        "software_list": software_list  # Place software_list as the last key
     }
 
     # Save to a JSON file
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     json_output_file = f"all_collected_data_{timestamp}.json"
-    save_to_json(system_info, software_list, json_output_file)
+    save_to_json(collected_data, None, json_output_file)
+
+    # Print payload before sending
+    print("Payload being sent to the server:")
+    print(json.dumps(collected_data, indent=4))
 
     # Send the JSON file to the central server
+    SERVER_URL = "http://192.168.25.89:5000/api/asset"  # Replace with your server's URL
     print("\nSending JSON file to the server...")
     send_json_to_server(json_output_file, SERVER_URL)
-
-
-
-# python -m PyInstaller --onefile --name "AssetAgent" main.py
-# run the command above to create a standalone executable for the script
-# The executable will be created in the "dist" folder.
-# You can run the executable on any Windows machine to collect system information and installed software.
-# Make sure to have the required permissions to access the registry and run WMIC commands.
-# The server should be running and accessible at the specified SERVER_URL.
-# The JSON file will be saved locally and sent to the server for further processing.

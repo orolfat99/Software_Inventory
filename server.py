@@ -9,24 +9,19 @@ app = Flask(__name__)
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)  # Ensure the directory exists
 
-def save_data_to_json(system_info, software_list):
+def save_data_to_json(data):
     """
     Save the received data to a JSON file.
     """
     try:
-        # Get the Node Name from system_info
-        node_name = system_info.get("Node Name", "Unknown").replace(" ", "_")
+        # Extract Node Name from the system_info section
+        node_name = data.get("system_info", {}).get("Node Name", "Unknown").replace(" ", "_")
 
-        # Generate a filename based on the Node Name
-        output_file = os.path.join(DATA_DIR, f"{node_name}.json")
+        # Generate a filename based on the Node Name and timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(DATA_DIR, f"{node_name}_{timestamp}.json")
 
-        # Combine system_info and software_list into a single dictionary
-        data = {
-            "system_info": system_info,
-            "software_list": software_list
-        }
-
-        # Write the data to the JSON file
+        # Save the entire data to the JSON file
         with open(output_file, mode="w", encoding="utf-8") as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
 
@@ -41,13 +36,12 @@ def receive_asset_data():
     Endpoint to receive asset data from the agent.
     """
     data = request.json
-    if data:
-        # Extract system info and software list
-        system_info = data.get("system_info", {})
-        software_list = data.get("software_list", [])
+    print("Received payload:")
+    print(json.dumps(data, indent=4))  # Log the received data for debugging
 
-        # Save the data to a JSON file
-        save_data_to_json(system_info, software_list)
+    if data:
+        # Save the received data to a JSON file
+        save_data_to_json(data)
 
         return jsonify({"message": "Data received and saved successfully"}), 200
     return jsonify({"error": "No data received"}), 400

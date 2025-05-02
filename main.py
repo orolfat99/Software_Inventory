@@ -398,10 +398,40 @@ if __name__ == "__main__":
     save_to_json(collected_data, None, json_output_file)
 
     # Print payload before sending
-    print("Payload being sent to the server:")
-    print(json.dumps(collected_data, indent=4))
+    # print("Payload being sent to the server:")
+    # print(json.dumps(collected_data, indent=4))
 
     # Send the JSON file to the central server
     SERVER_URL = "http://192.168.25.89:5000/api/asset"  # Replace with your server's URL
     print("\nSending JSON file to the server...")
-    send_json_to_server(json_output_file, SERVER_URL)
+    # send_json_to_server(json_output_file, SERVER_URL)
+
+# Example payload
+# SERVER_URL = "http://192.168.25.89:5000/api/asset"
+
+# example_collected_data = {
+#     "system_info": {
+#         "System": "Windows",
+#         "Node Name": "P10241201-PC",
+#         "Release": "10",
+#         "Version": "10.0.19045",
+#         "Machine": "AMD64",
+#         "Processor": "Intel64 Family 6 Model 158 Stepping 10, GenuineIntel",
+#         "MAC Address": "00:0a:cd:43:71:0c"
+#     },
+#     "software_list": [
+#         {"Name": "Google Chrome", "Version": "112.0", "Vendor": "Google LLC"}
+#     ]
+# }
+
+# Send the example payload
+response = requests.post(SERVER_URL, json=collected_data)
+print(f"Response from server: {response.status_code}, {response.text}")
+
+# python -m PyInstaller --onefile --name "AssetAgent" main.py
+# run the command above to create a standalone executable for the script
+# The executable will be created in the "dist" folder.
+# You can run the executable on any Windows machine to collect system information and installed software.
+# Make sure to have the required permissions to access the registry and run WMIC commands.
+# The server should be running and accessible at the specified SERVER_URL.
+# The JSON file will be saved locally and sent to the server for further processing.

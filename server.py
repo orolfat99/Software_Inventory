@@ -14,6 +14,10 @@ def save_data_to_json(data):
     Save the received data to a JSON file.
     """
     try:
+        # Print the received data for debugging
+        print("Data received by save_data_to_json:")
+        print(json.dumps(data, indent=4))  # Pretty-print the data
+
         # Extract Node Name from the system_info section
         node_name = data.get("system_info", {}).get("Node Name", "Unknown").replace(" ", "_")
 
@@ -35,16 +39,22 @@ def receive_asset_data():
     """
     Endpoint to receive asset data from the agent.
     """
-    data = request.json
-    print("Received payload:")
-    print(json.dumps(data, indent=4))  # Log the received data for debugging
+    try:
+        data = request.json  # Parse the JSON payload
+        if not data:
+            print("No JSON payload received or payload is empty.")
+            return jsonify({"error": "No JSON payload received"}), 400
 
-    if data:
+        print("Received payload:")
+        print(json.dumps(data, indent=4))  # Log the received data for debugging
+
         # Save the received data to a JSON file
         save_data_to_json(data)
 
         return jsonify({"message": "Data received and saved successfully"}), 200
-    return jsonify({"error": "No data received"}), 400
+    except Exception as e:
+        print(f"Error processing request: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
